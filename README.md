@@ -38,3 +38,6 @@ LXC services that run docker will update docker service by pulling the latest co
 scripts are made to run by default on all LXC from host but do accept cutom flags 
 -c CTID1, CTID2 >> container specific only 
 -s CTID1, CTID2 >> skip specific containers from the host pool
+
+## Credits
+This is based on the work of https://github.com/community-scripts/ProxmoxVE and trys to improve and give more control to the update custom command.
