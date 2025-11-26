@@ -1,0 +1,5 @@
+[2025-11-26 23:26:38] Starting to pull update menu 25 containers
+[2025-11-26 23:26:40] WARNING: /opt/update/update-menu.sh does not exist in CT 100 → skipping
+[2025-11-26 23:26:42] WARNING: /opt/update/update-menu.sh does not exist in CT 101 → skipping
+[2025-11-26 23:26:44] WARNING: /opt/update/update-menu.sh does not exist in CT 102 → skipping
+[2025-11-26 23:26:59] WARNING: /opt/update/update-menu.sh does not exist in CT 103 → skipping

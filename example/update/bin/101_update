@@ -1,0 +1,2 @@
+#bash -c "$(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/ct/qbittorrent.sh)"
+bash -c /opt/update/update-menu.sh

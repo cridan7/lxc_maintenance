@@ -1,0 +1,2 @@
+#bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/ct/nginxproxymanager.sh)"
+bash -c /opt/update/update-menu.sh
