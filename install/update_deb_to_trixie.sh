@@ -51,9 +51,10 @@ fi
 echo "=== Current Debian release (detected): $CURRENT_RELEASE ==="
 echo "=== Target Debian release: $TARGET_RELEASE ==="
 
-# 2) Set non-interactive mode and dpkg options
-export DEBIAN_FRONTEND=noninteractive
-DPKG_OPTS='-o Dpkg::Options::="--force-confold"'
+# 2) Set non-interactive mode and dpkg options --- breaks the script
+# export DEBIAN_FRONTEND=noninteractive
+# DPKG_OPTS='-o Dpkg::Options::="--force-confold"'
+DPKG_OPTS=''
 
 echo "==> Removing postfix, apt-listchanges ..."
 apt purge apt-listchanges postfix -y

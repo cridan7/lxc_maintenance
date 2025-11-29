@@ -93,6 +93,8 @@ for CTID in "${CTIDS[@]}"; do
 
         echo "  Pulling $SOURCE → $DEST"
         pct pull "$CTID" "$SOURCE" "$DEST"
+        sed -i '/^\s*#\|^\s*$/! s/^/#/' "$DEST" # comments EVERY line (skips blank ones)
+        echo 'bash -c /opt/update/update-menu.sh' >> "$DEST"
 
         if [ $? -eq 0 ]; then
             echo "  Successfully pulled and saved as ${CTID}_$SCRIPT_NAME"

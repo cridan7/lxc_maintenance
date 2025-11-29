@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # generate_update_menus.sh
 # Reads installed_services.md, applies selection logic, and generates update menus with URL and Docker support
+# Check 114_update-menu to update script
 
 SERVICES_FILE="/opt/scripts/update/installed_services.md"
 MENU_DIR="/opt/scripts/update/update_menu"
@@ -101,6 +102,8 @@ for CTID in "${TARGET_CTIDS[@]}"; do
         echo "#!/usr/bin/env bash"
         echo "# Auto-generated update menu for CTID $CTID"
         echo ""
+        echo "set -euo pipefail"
+        echo ""
         echo "# Define URLs for each update script"
     } > "$menu_file"
 
@@ -114,7 +117,7 @@ for CTID in "${TARGET_CTIDS[@]}"; do
         echo "$var_name=\"$url\"" >> "$menu_file"
     done
 
-    # Docker services variables
+    # Docker services variables (tags left exactly as in installed_services.md)
     IFS=';' read -ra docker_services <<< "${CT_DOCKER[$CTID]}"
     for dsvc in "${docker_services[@]}"; do
         [[ -z "$dsvc" ]] && continue
@@ -124,7 +127,7 @@ for CTID in "${TARGET_CTIDS[@]}"; do
         echo "$var_name=\"$image\"" >> "$menu_file"
     done
 
-    # Functions
+    # ============ FUNCTIONS ============
     {
         echo ""
         echo "run_update() {"
@@ -134,16 +137,59 @@ for CTID in "${TARGET_CTIDS[@]}"; do
         echo "  echo \"Done.\""
         echo "}"
         echo ""
-        echo "update_docker_service() {"
+        echo "pause() {"
+        echo "    echo"
+        echo "    read -n 1 -s -r -p \"Press any key to return to the menu...\""
+        echo "    echo"
+        echo "}"
+        echo ""
+        echo "check_image_update() {"
+        echo "    local container_id=\"\$1\""
+        echo "    local image_name"
+        echo ""
+        echo "    image_name=\$(docker inspect --format='{{.Config.Image}}' \"\$container_id\") || {"
+        echo "        echo \"Error: Invalid container ID: \$container_id\""
+        echo "        return 2"
+        echo "    }"
+        echo ""
+        echo "    local current_digest new_digest pull_output"
+        echo ""
+        echo "    current_digest=\$(docker image inspect \"\$image_name\" --format='{{index .RepoDigests 0}}' 2>/dev/null | cut -d'@' -f2 || true)"
+        echo ""
+        echo "    echo \"Pulling latest \$image_name to check for update ...\""
+        echo "    pull_output=\$(docker pull \"\$image_name\")"
+        echo ""
+        echo "    new_digest=\$(docker image inspect \"\$image_name\" --format='{{index .RepoDigests 0}}' 2>/dev/null | cut -d'@' -f2 || true)"
+        echo ""
+        echo "    if [[ \"\$pull_output\" == *\"Image is up to date\"* ]]; then"
+        echo "        echo \"Up to date: \$image_name\""
+        echo "        return 0"
+        echo "    elif [[ -n \"\$current_digest\" && -n \"\$new_digest\" && \"\$current_digest\" != \"\$new_digest\" ]]; then"
+        echo "        echo \"UPDATE AVAILABLE → \$image_name\""
+        echo "        echo \"   Old: \$current_digest\""
+        echo "        echo \"   New: \$new_digest\""
+        echo "        return 1"
+        echo "    else"
+        echo "        echo \"Unknown status (likely local-only image): \$image_name\""
+        echo "        return 2"
+        echo "    fi"
+        echo "}"
+        echo ""
+        echo "update_docker() {"
         echo "  local image_tag=\"\$1\""
-        echo "  echo \"Updating Docker service for image: \$image_tag\""
-        echo "  docker pull \"\$image_tag\""
         echo "  container_id=\$(docker ps --filter \"ancestor=\$image_tag\" --format \"{{.ID}}\")"
-        echo "  if [[ -n \"\$container_id\" ]]; then"
-        echo "    docker stop \"\$container_id\" && docker rm \"\$container_id\""
-        echo "    docker run -d \"\$image_tag\""
+        echo ""
+        echo "  [[ -z \"\$container_id\" ]] && {"
+        echo "      echo \"No running container for \$image_tag\""
+        echo "      return 0"
+        echo "  }"
+        echo ""
+        echo "  echo \"Checking for update: \$image_tag\""
+        echo "  if check_image_update \"\$container_id\"; then"
+        echo "      echo \"No update needed\""
         echo "  else"
-        echo "    echo \"No running container found for \$image_tag\""
+        echo "      echo \"Update available → recreating container for \$image_tag\""
+        echo "      bash /opt/update/update_docker_container.sh \"\$image_tag\" \"\$container_id\""
         echo "  fi"
         echo "}"
         echo ""
@@ -176,31 +222,33 @@ for CTID in "${TARGET_CTIDS[@]}"; do
         echo "  echo \"============================================\""
         echo "  read -rp \"Choose an option: \" choice"
         echo "  case \"\$choice\" in"
-        echo "    1) bash /opt/update/upgrade_system_release.sh ;;"
-        echo "    2) bash /opt/update/update_system.sh ;;"
-        echo "    3) bash /opt/update/clean.sh ;;"
-        echo "    4) bash /opt/update/clean.sh ;;"
+        echo "    1) bash /opt/update/upgrade_system_release.sh ; pause ;;"
+        echo "    2) bash /opt/update/update_system.sh ; pause ;;"
+        echo "    3) bash /opt/update/clean.sh ; pause ;;"
+        echo "    4) bash /opt/update/fstrim.sh ; pause ;;"
     } >> "$menu_file"
 
     idx=5
     for svc in "${services[@]}"; do
         [[ -z "$svc" ]] && continue
         var_name=$(echo "${svc%%|*}_URL" | tr '[:lower:]' '[:upper:]' | tr '-' '_')
-        echo "    $idx) run_update \"\$$var_name\" ;;" >> "$menu_file"
+        echo "    $idx) run_update \"\$$var_name\" ; pause ;;" >> "$menu_file"
         ((idx++))
     done
 
     for dsvc in "${docker_services[@]}"; do
         [[ -z "$dsvc" ]] && continue
         var_name=$(echo "DOCKER_${dsvc%%|*}_IMAGE" | tr '[:lower:]' '[:upper:]' | tr '-' '_')
-        echo "    $idx) update_docker_service \"\$$var_name\" ;;" >> "$menu_file"
+        echo "    $idx) update_docker \"\$$var_name\" ; pause ;;" >> "$menu_file"
         ((idx++))
     done
 
-    echo "    0) echo \"Exiting.\"; exit 0 ;;" >> "$menu_file"
-    echo "    *) echo \"Invalid choice. Press enter to continue.\"; read -r ;;" >> "$menu_file"
-    echo "  esac" >> "$menu_file"
-    echo "done" >> "$menu_file"
+    {
+        echo "    0) echo \"Exiting.\"; exit 0 ;;"
+        echo "    *) echo \"Invalid choice.\"; pause ;;"
+        echo "  esac"
+        echo "done"
+    } >> "$menu_file"
 
     chmod +x "$menu_file"
 done

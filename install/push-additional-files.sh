@@ -2,7 +2,7 @@
 
 DESTINATION_PATH="/opt/update"
 SOURCE_PATH="/opt/scripts/update"
-SOURCE_NAME="clean.sh, fstrim.sh, update_system.sh"   # ← comma-separated list, spaces allowed
+SOURCE_NAME="clean.sh, fstrim.sh, update_system.sh, update_docker_container.sh"   # ← comma-separated list, spaces allowed
 LOG_DIR="/opt/scripts/update/log"
 LOG_FILE="$LOG_DIR/lxc_push_log"
 

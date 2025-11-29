@@ -1,3 +1,7 @@
+###  To install run 
+bash -c "$(wget -qLO - https://github.com/cridan7/lxc_maintenance/raw/refs/heads/main/install.sh)"
+
+### To use follow the steps
 ## Step 1
 run and ./push-update-scripts-to-lxc.sh to push system distribution based upgrade script to the LXCs
 upgrade script located in /opt/update/upgrade_system_release.sh"
@@ -38,6 +42,17 @@ LXC services that run docker will update docker service by pulling the latest co
 scripts are made to run by default on all LXC from host but do accept cutom flags 
 -c CTID1, CTID2 >> container specific only 
 -s CTID1, CTID2 >> skip specific containers from the host pool
+
+## INFO
+Upgrade system can is not running silent in non interactive mode. 
+For docker unprivillaged containers add this lines to the conf 
+lxc.apparmor.profile: unconfined
+lxc.cgroup2.devices.allow: a
+lxc.cap.drop: 
+Upgrade will break docker for 2025 proxmox because of apparmor
+
+## To cleanup LXC run 
+rm-files.sh --all
 
 ## Credits
 This is based on the work of https://github.com/community-scripts/ProxmoxVE and trys to improve and give more control to the update custom command.

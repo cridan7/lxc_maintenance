@@ -1,10 +1,15 @@
-
 #!/bin/bash
+set -euo pipefail
 
 LOG_DIR="/opt/scripts/update/log"
 LOG_FILE="$LOG_DIR/lxc_remove_log"
 DIR_TO_LIST="/opt/update/"
-FILE_TO_REMOVE="/opt/update/update_system_release.sh"
+FILE_NAMES="clean.sh, fstrim.sh, update_system.sh, update_docker_container.sh"   # ← comma-separated list, spaces allowed
+
+# Split SOURCE_NAME into array (comma-separated, trim spaces)
+IFS=',' read -ra FILES_TO_REMOVE <<< "$FILE_NAMES"
+FILES_TO_REMOVE=("${FILES_TO_REMOVE[@]%"${FILES_TO_REMOVE##*[! ]}"}")  # trim trailing
+FILES_TO_REMOVE=("${FILES_TO_REMOVE[@]#*"${FILES_TO_REMOVE%%[! ]*}"}")  # trim leading
 
 # Ensure log directory exists
 mkdir -p "$LOG_DIR"
@@ -13,45 +18,45 @@ mkdir -p "$LOG_DIR"
 ALL_CTIDS=($(pct list | awk 'NR>1 {print $1}'))
 CTIDS=("${ALL_CTIDS[@]}")  # Default: all containers
 
-MODE="all"
-SKIP_IDS=()
-CUSTOM_IDS=()
+MODE="all"          # all | custom | skip
+DELETE_ALL=false    # false = only specific files, true = rm -rf everything
 
-# Parse arguments
+# Parse arguments ---------------------------------------------------------------
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        -c)
+        -all|--all)
+            DELETE_ALL=true
+            shift
+            ;;
+        -c|--custom)
             MODE="custom"
             shift
-            IFS=',' read -ra CUSTOM_IDS <<< "$1"
+            IFS=',' read -ra CTIDS <<< "$(echo "$1" | tr -d '[:space:]')"
+            shift
             ;;
-        -s)
+        -s|--skip)
             MODE="skip"
             shift
-            IFS=',' read -ra SKIP_IDS <<< "$1"
+            IFS=',' read -ra SKIP_IDS <<< "$(echo "$1" | tr -d '[:space:]')"
+            shift
             ;;
-        --help|-h)
-            echo "Usage:"
-            echo "  $0                # Process all containers"
-            echo "  $0 -c 100,110     # Process only these containers"
-            echo "  $0 -s 100,110     # Process all except these containers"
+        -h|--help)
+            echo "Usage: $0 [-all] [-c 100,101] [-s 102]"
             exit 0
             ;;
         *)
-            echo "Unknown option: $1"
+            echo "Unknown option: $1" >&2
             exit 1
             ;;
     esac
-    shift
 done
 
-# Apply mode logic
+# Apply mode logic -------------------------------------------------------------
 if [[ "$MODE" == "custom" ]]; then
-    CTIDS=("${CUSTOM_IDS[@]}")
-
+    : # CTIDS already set above
 elif [[ "$MODE" == "skip" ]]; then
     NEW_CTIDS=()
-    for ct in "${CTIDS[@]}"; do
+    for ct in "${ALL_CTIDS[@]}"; do
         skip=false
         for id in "${SKIP_IDS[@]}"; do
             [[ "$ct" == "$id" ]] && skip=true && break
@@ -61,12 +66,16 @@ elif [[ "$MODE" == "skip" ]]; then
         fi
     done
     CTIDS=("${NEW_CTIDS[@]}")
+else
+    CTIDS=("${ALL_CTIDS[@]}")   # default = all
 fi
+
+[[ ${#CTIDS[@]} -eq 0 ]] && { echo "No containers selected"; exit 1; }
 
 echo "Found ${#CTIDS[@]} LXC containers. Starting processing..."
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting cleanup for ${#CTIDS[@]} containers" >> "$LOG_FILE"
 
-# Loop through containers
+# Loop through containers -------------------------------------------------------
 for CTID in "${CTIDS[@]}"; do
     echo "=== CT $CTID ==="
     STARTED_BY_US=0
@@ -79,11 +88,31 @@ for CTID in "${CTIDS[@]}"; do
         echo "  Already running"
     fi
 
-
-    if pct exec "$CTID" -- rm -f $FILE_TO_REMOVE; then
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] CTID $CTID: Removed $FILE_TO_REMOVE" >> "$LOG_FILE"
+    if $DELETE_ALL; then
+        # ───── NUCLEAR OPTION ─────
+        if pct exec "$CTID" -- bash -c "rm -rf ${DIR_TO_LIST}*"; then
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] CTID $CTID: Removed all files & folders from ${DIR_TO_LIST}" >> "$LOG_FILE"
+        else
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] CTID $CTID: ERROR removing all files & folders from ${DIR_TO_LIST}" >> "$LOG_FILE"
+        fi
+        if pct exec "$CTID" -- bash -c "sed -i -e '/^\s*#/s/^\\s*#\\s*//' -e '/^\s*$/d' -e '/update-menu\.sh/d' /bin/update"; then
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] CTID $CTID: Removed all comments from /bin/update, update-menu.sh entry" >> "$LOG_FILE"
+        else
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] CTID $CTID: ERROR editing /bin/update" >> "$LOG_FILE"
+        fi
     else
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] CTID $CTID: ERROR removing file" >> "$LOG_FILE"
+        # ───── NORMAL MODE – only specific files ─────
+        for file in "${FILES_TO_REMOVE[@]}"; do
+            CURRENT_FILE_TO_REMOVE="$(echo "$file" | xargs)"  # trim whitespace
+            [[ -z "$CURRENT_FILE_TO_REMOVE" ]] && continue
+            FILE_TO_REMOVE="${DIR_TO_LIST}${CURRENT_FILE_TO_REMOVE}"   # ← fixed: no \ before $
+            
+            if pct exec "$CTID" -- rm -f "$FILE_TO_REMOVE"; then
+                echo "[$(date '+%Y-%m-%d %H:%M:%S')] CTID $CTID: Removed $FILE_TO_REMOVE" >> "$LOG_FILE"
+            else
+                echo "[$(date '+%Y-%m-%d %H:%M:%S')] CTID $CTID: ERROR removing file" >> "$LOG_FILE"
+            fi
+        done 
     fi
 
     # Capture the directory listing and log everything nicely
@@ -101,6 +130,7 @@ for CTID in "${CTIDS[@]}"; do
         pct status "$CTID" | grep -q running && pct stop "$CTID"
     fi
 done
+
 echo
 echo "===================================================================="
 echo "Finished! Log saved to →  $LOG_FILE"
