@@ -69,6 +69,8 @@ Notes:
 * Generates installed_services.md (used in the next step)
 * The script can detect multiple services running inside the same LXC.
 
+Important: `installed_services.md `must be manually pruned/reviewed. Not all services match 100% automatically (check examples).
+
 ### Step 6
 
 ```bash
@@ -171,4 +173,3 @@ Based on the work of the Proxmox VE Community Scripts repository: [GitHub - comm
 This toolkit aims to extended and give more control and customization to the original community update mechanism.
 
 Enjoy your customizable LXC updates!
-
