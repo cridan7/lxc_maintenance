@@ -199,7 +199,7 @@ for CTID in "${TARGET_CTIDS[@]}"; do
         echo "  echo \"1) Upgrade operating system\""
         echo "  echo \"2) Update operating system\""
         echo "  echo \"3) Clean operating system\""
-        echo "  echo \"4) Fstrim container LVM\""
+        echo "  echo \"4) Fstrim container LVM (will not work in unprivileged containers)\""
     } >> "$menu_file"
 
     idx=5

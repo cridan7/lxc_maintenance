@@ -143,15 +143,18 @@ Scripts run on all LXCs by default but accept custom filters:
 ### Notes
 
 - System upgrades are **non-interactiv**e and **non-silent** by design.
-- For unprivileged Docker LXCs, add to your `/etc/pve/lxc/<CTID>.conf` file:
-
+- Proxmox 2025 upgrades will break Docker because of AppArmor changes. For unprivileged Docker LXCs, add to your `/etc/pve/lxc/<CTID>.conf` file:
 ```
 lxc.apparmor.profile: unconfined
 lxc.cgroup2.devices.allow: a
 lxc.cap.drop:
 ```
-
-- Proxmox 2025 upgrades will break Docker because of AppArmor changes.
+`runc ≥ 1.1.15-0+deb12u1` (or newer) and `Docker ≥ 27.2.x` inside the LXC.
+These versions introduced a new hard restriction: even with `CAP_SYS_ADMIN`, `runc` refuses to reopen any `sysctl` file descriptor if the kernel was booted with `sysctl`.`kernel.unprivileged_userns_clone=0` or if the LXC still has any capability dropped in a weird way
+- For unprivileged Docker LXCs, `Fstrim container LVM` option will not work. Run the the community script from host:
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/tools/pve/fstrim.sh)"
+```
 
 ## Cleanup (remove all pushed files from LXCs)
 
