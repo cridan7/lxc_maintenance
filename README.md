@@ -2,6 +2,8 @@
 
 A set of scripts to centrally manage, update, and maintain multiple LXC containers from the Proxmox host — with full support for community scripts and Docker containers running inside LXCs.
 
+## Backup your containers before updating. The update, upgrade process may break your service
+
 ### Quick Installation
 
 ```bash
