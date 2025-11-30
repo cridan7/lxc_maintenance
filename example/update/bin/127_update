@@ -1,2 +1,0 @@
-#bash -c "$(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/ct/actualbudget.sh)"
-bash -c /opt/update/update-menu.sh

@@ -1,2 +1,0 @@
-#bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/ct/pihole.sh)"
-bash -c /opt/update/update-menu.sh
